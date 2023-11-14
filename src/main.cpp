@@ -75,6 +75,7 @@ void setup()
     {
         ; // wait for serial port to connect. Needed for native USB port only
     }
+    SPI.begin();
     if (!SD.begin(5))
     {
         Serial.println("initialization failed!");
@@ -165,31 +166,34 @@ void TaskLCD(void *pvParameters)
     {
 
         xSemaphoreTake(spiMutex, portMAX_DELAY);
+        u8g2.clearDisplay();
         u8g2.firstPage();
         do
         {
-            if (current_u8g_page == 0)
-            {
-                drawTime(u8g2);
-            };
+            // if (current_u8g_page == 0)
+            // {
+            //     drawTime(u8g2);
+            // };
+            drawTime(u8g2);
             switch (message.mode)
             {
             case Scan_finger:
-                u8g2.drawFile(0, 40, "/sd/bin/Scan_finger.bin");
-                break;
-            case Insert_finger:
-                u8g2.drawFile(0, 40, "/sd/bin/Insert_finger.bin");
+                u8g2.drawFile(0, 40, "/bin/u8g2.bin");
                 break;
             case Correct_finger:
+                Serial.println(message.noti);
                 u8g2.setCursor(0, 40); // Đặt vị trí để in tên
                 u8g2.print(message.noti); // In tên lên màn hình
-                u8g2.drawFile(0, 60, "/sd/bin/Correct_finger.bin");
+                u8g2.drawFile(0, 40, "/bin/Correct_finger.bin");
                 vTaskDelay(pdMS_TO_TICKS(2000));
                 memset(message.noti, 0, 20);
                 message.mode = Scan_finger;
                 break;
+            case Insert_finger:
+                u8g2.drawFile(0, 40, "/bin/Insert_finger.bin");
+                break;
             case Incorrect_finger:
-                u8g2.drawFile(0, 40, "/sd/bin/Incorrect_finger.bin");
+                u8g2.drawFile(0, 40, "/bin/Incorrect_finger.bin");
                 break;
             default:
                 break;
@@ -215,8 +219,10 @@ void TaskSQL(void *pvParameters)
             xSemaphoreTake(spiMutex, portMAX_DELAY);
             db_query(finger_id, &user);
             if(user.name != NULL){
+
                 strcpy(message.noti, user.name);
-                printf("Name: %s, Finger_id: %d\n", user.name, user.finger_id);
+                message.mode = Correct_finger;
+                Serial.printf("Name: %s, Finger_id: %d\n", user.name, user.finger_id);
             }
             xSemaphoreGive(spiMutex);
             
@@ -243,7 +249,7 @@ void TaskInternet(void *pvParameters)
 
     WiFi.begin(ssid, password);
     Serial.print("Connecting to WiFi...");
-    for (int count; count < 20 || WiFi.status() == WL_CONNECTED; count++)
+    for (int count; count < 20 && WiFi.status() != WL_CONNECTED; count++)
     {
         Serial.print(".");
         vTaskDelay(pdMS_TO_TICKS(500));

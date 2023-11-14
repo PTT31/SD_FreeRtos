@@ -5,7 +5,7 @@
 #include <FS.h>
 #include "SD.h"
 
-#define USER_DB "/sd/data/users.db"
+#define USER_DB "/sd/Database/User.db"
 class User_if{
     public:
     const char *name;
