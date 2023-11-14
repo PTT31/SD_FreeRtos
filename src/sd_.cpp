@@ -69,8 +69,8 @@ int db_query(int data, User_if *user)
     {
         user->name = strdup((const char *)sqlite3_column_text(res, 1));
         user->finger_id = sqlite3_column_int(res, 0);
-        Serial.print("SDquerr");
-        Serial.printf(user->name);
+        //Serial.print("SDquerr");
+        // Serial.printf(user->name);
     }
     sqlite3_finalize(res); // Cleanup
     sqlite3_close(db1);
