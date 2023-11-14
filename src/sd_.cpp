@@ -65,12 +65,14 @@ int db_query(int data, User_if *user)
         Serial.println("Dont open database");
         return -1;
     }
-    while (sqlite3_step(res) == SQLITE_ROW)
-    {
+    if (sqlite3_step(res) == SQLITE_ROW) {
+        // Sử dụng strdup để cấp phát động bộ nhớ cho name
         user->name = strdup((const char *)sqlite3_column_text(res, 1));
         user->finger_id = sqlite3_column_int(res, 0);
-        //Serial.print("SDquerr");
-        // Serial.printf(user->name);
+        Serial.println(user->name);
+    } else {
+        Serial.println("No data found");
+        user->name = NULL;  // Đặt name thành NULL nếu không có dữ liệu
     }
     sqlite3_finalize(res); // Cleanup
     sqlite3_close(db1);
