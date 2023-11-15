@@ -58,9 +58,9 @@ void drawTime(U8G2_ST7567_JLX12864_F_4W_HW_SPI u8g2)
     DateTime now;
     u8g2.setCursor(0, 12);
     now = rtc.now();
-    String dateTimeString = String(now.year(), DEC) + '/' +
-                            String(now.month(), DEC) + '/' +
-                            String(now.day(), DEC) + ' ' +
+    String dateTimeString = String(now.month(), DEC) + '/' +
+                            String(now.day(), DEC) + '/' +
+                            String(now.year(), DEC) + ' '+
                             String(now.hour(), DEC) + ':' +
                             String(now.minute(), DEC) + ':' +
                             String(now.second(), DEC);
@@ -69,15 +69,14 @@ void drawTime(U8G2_ST7567_JLX12864_F_4W_HW_SPI u8g2)
 };
 void record(User_if user) {
     // if the file is available, write to it:
-    File dataFile = SD.open("/record/Login.txt", FILE_APPEND); // Mở file để ghi thêm dữ liệu
+    File dataFile = SD.open("/record/Login.csv", FILE_APPEND); // Mở file để ghi thêm dữ liệu
     if (dataFile) {
         DateTime now = rtc.now();
-        char buffer[100]; // Dung lượng đủ lớn để lưu trữ dữ liệu
-        sprintf(buffer, "%d/%d/%d %d:%d:%d %s:%d",
-                now.year(), now.month(), now.day(),
+        char buffer[50]; // Dung lượng đủ lớn để lưu trữ dữ liệu
+        sprintf(buffer, " %d/%d/%d,%d:%d:%d,%s,%d",
+                now.month(), now.day(), now.year(),
                 now.hour(), now.minute(), now.second(),
                 user.name, user.finger_id);
-
         dataFile.println(buffer);
         dataFile.close();
         Serial.println(buffer);
@@ -178,9 +177,8 @@ void TaskLCD(void *pvParameters)
 
     LCD u8g2;
     u8g2.begin();
-    u8g2.setFont(u8g2_font_helvR10_tr);
+    u8g2.setFont(u8g2_font_timB10_tr);
     u8g2.setContrast(30);
-    int current_u8g_page;
     while (1)
     {
 
@@ -189,19 +187,23 @@ void TaskLCD(void *pvParameters)
         u8g2.firstPage();
         do
         {
-            // if (current_u8g_page == 0)
-            // {
-            //     drawTime(u8g2);
-            // };
             drawTime(u8g2);
             switch (message.mode)
             {
             case Scan_finger:
-                u8g2.drawFile(0, 40, "/bin/Scan_finger.bin");
+                u8g2.setCursor(0, 24);    // Đặt vị trí để in tên
+                u8g2.print("Welcome to Haui");
+                u8g2.setCursor(0, 36);    // Đặt vị trí để in tên
+                u8g2.print("Please put finger"); // In tên lên màn hình
+                u8g2.setCursor(0,48);
+                u8g2.print("on sensor");
+
                 break;
             case Correct_finger:
                 Serial.println(message.noti);
-                u8g2.setCursor(0, 30);    // Đặt vị trí để in tên
+                u8g2.setCursor(0, 24);    // Đặt vị trí để in tên
+                u8g2.print(" Welcome");
+                u8g2.setCursor(0, 36);    // Đặt vị trí để in tên
                 u8g2.print(message.noti); // In tên lên màn hình
                 u8g2.drawFile(0, 40, "/bin/Correct_finger.bin");
                 break;
@@ -214,12 +216,10 @@ void TaskLCD(void *pvParameters)
             default:
                 break;
             }
-            current_u8g_page++;
         } while (u8g2.nextPage());
-        current_u8g_page = 0;
         Serial.println(xPortGetFreeHeapSize());
         xSemaphoreGive(spiMutex);
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Đợi 2 giây trước khi lặp lại nhiệm vụ
+        vTaskDelay(pdMS_TO_TICKS(500)); // Đợi 2 giây trước khi lặp lại nhiệm vụ
     }
 }
 void TaskSQL(void *pvParameters)
@@ -233,13 +233,15 @@ void TaskSQL(void *pvParameters)
         {
             Serial.printf("ID find %d:\"\n", finger_id);
             xSemaphoreTake(spiMutex, portMAX_DELAY);
-            db_query(finger_id, &user);
-            if (user.name != NULL)
+            if(db_query(finger_id, &user) !=1){
+                message.mode = Incorrect_finger;
+                return;
+            }
+            else
             {
                 record(user);
                 message.noti = user.name;
                 message.mode = Correct_finger;
-                
                 // Serial.printf("Name: %c, Finger_id: %d\n", user.name, user.finger_id);
             }
             xSemaphoreGive(spiMutex);

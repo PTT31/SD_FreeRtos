@@ -1,11 +1,7 @@
 #include "sd_.h"
-char *zErrMsg = 0;
-const char *data = "Callback function called";
+// char *zErrMsg = 0;
+// const char *data = "Callback function called";
 int rc;
-sqlite3 *db1;
-sqlite3_stmt *res;
-int rec_count = 0;
-const char *tail;
 // static int callback(void *data, int argc, char **argv, char **azColName)
 // {
 //     int i;
@@ -54,7 +50,8 @@ const char *tail;
 // tìm user
 int db_query(int data, User_if *user)
 {
-
+    sqlite3 *db1;
+    sqlite3_stmt *res;
     const int bufferSize = 64; // Kích thước tối đa của chuỗi char
     char sqlQuery[bufferSize]; // Mảng char để lưu trữ chuỗi SQL
     snprintf(sqlQuery, bufferSize, "Select * from users where finger_id = '%d'", data);
@@ -73,26 +70,30 @@ int db_query(int data, User_if *user)
     } else {
         Serial.println("No data found");
         user->name = NULL;  // Đặt name thành NULL nếu không có dữ liệu
+        sqlite3_finalize(res); // Cleanup
+        sqlite3_close(db1);
+        return -1;
     }
     sqlite3_finalize(res); // Cleanup
     sqlite3_close(db1);
     return 1;
 }
-// Thêm user
-// int db_insert(char *id, char *name, char *role)
-// {
-
-//     // Đọc dữ liệu từ cổng serial
-//     const int bufferSize = 64;  // Kích thước tối đa của chuỗi char
-//     char sqlInsert[bufferSize]; // Mảng char để lưu trữ chuỗi SQL
-//     // In chuỗi SQL lên Serial Monitor
-//     snprintf(sqlInsert, bufferSize, "INSERT INTO user (uuid,name,finger_id, role) VALUES (%s,%s, %s, %s)", NULL, id, name, role);
-//     Serial.println(sqlInsert);
-//     openDb(USER_DB, &db1);
-//     rc = sqlite3_prepare_v2(db1, sqlInsert, -1, &res, NULL);
-//     sqlite3_close(db1);
-//     return 1;
-// }
+//Thêm user
+int db_insert(char *id, char *name, char *role)
+{
+    sqlite3 *db1;
+    sqlite3_stmt *res;
+    // Đọc dữ liệu từ cổng serial
+    const int bufferSize = 64;  // Kích thước tối đa của chuỗi char
+    char sqlInsert[bufferSize]; // Mảng char để lưu trữ chuỗi SQL
+    // In chuỗi SQL lên Serial Monitor
+    snprintf(sqlInsert, bufferSize, "INSERT INTO users (uuid,name,finger_id, role) VALUES (%s,%s, %s, %s)", NULL, id, name, role);
+    Serial.println(sqlInsert);
+    openDb(USER_DB, &db1);
+    rc = sqlite3_prepare_v2(db1, sqlInsert, -1, &res, NULL);
+    sqlite3_close(db1);
+    return 1;
+}
 // //xóa user
 // int db_delete(char *data){
 
