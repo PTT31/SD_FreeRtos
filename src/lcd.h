@@ -9,8 +9,6 @@
 
 class LCD : public U8G2_ST7567_JLX12864_F_4W_HW_SPI {
 public:
-    char ip_adress[20] = "Connect Wifi...";
-    void drawIP(char *data);
     void drawFile(u8g2_int_t x, u8g2_int_t y, const char *filename);
     LCD() : U8G2_ST7567_JLX12864_F_4W_HW_SPI(U8G2_R0, /* cs=*/21, /* dc=*/4, /* reset=*/0) {
         begin();

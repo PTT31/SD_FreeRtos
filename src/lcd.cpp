@@ -50,7 +50,3 @@ void LCD::drawFile(u8g2_int_t x, u8g2_int_t y, const char *filename)
     }
     setDrawColor(1); // restore color
 }
-
-void LCD::drawIP(char *data){
-    print(data);
-}

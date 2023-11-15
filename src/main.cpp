@@ -202,7 +202,7 @@ void TaskLCD(void *pvParameters)
             case Correct_finger:
                 Serial.println(message.noti);
                 u8g2.setCursor(0, 24);    // Đặt vị trí để in tên
-                u8g2.print(" Welcome");
+                u8g2.print("Welcome to Haui");
                 u8g2.setCursor(0, 36);    // Đặt vị trí để in tên
                 u8g2.print(message.noti); // In tên lên màn hình
                 u8g2.drawFile(0, 40, "/bin/Correct_finger.bin");
@@ -211,7 +211,8 @@ void TaskLCD(void *pvParameters)
                 u8g2.drawFile(0, 40, "/bin/Insert_finger.bin");
                 break;
             case Incorrect_finger:
-                u8g2.drawFile(0, 40, "/bin/Incorrect_finger.bin");
+                u8g2.setCursor(0, 24);    // Đặt vị trí để in tên
+                u8g2.print("Scan again");
                 break;
             default:
                 break;
@@ -233,16 +234,16 @@ void TaskSQL(void *pvParameters)
         {
             Serial.printf("ID find %d:\"\n", finger_id);
             xSemaphoreTake(spiMutex, portMAX_DELAY);
-            if(db_query(finger_id, &user) !=1){
-                message.mode = Incorrect_finger;
-                return;
-            }
-            else
+            db_query(finger_id,&user);
+            if(user.name != NULL)
             {
                 record(user);
                 message.noti = user.name;
                 message.mode = Correct_finger;
                 // Serial.printf("Name: %c, Finger_id: %d\n", user.name, user.finger_id);
+            }
+            else{
+                message.mode = Incorrect_finger;
             }
             xSemaphoreGive(spiMutex);
             vTaskDelay(5000);
