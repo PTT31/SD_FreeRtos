@@ -60,6 +60,8 @@ int db_query(int data, User_if *user)
     if (rc != SQLITE_OK)
     {
         Serial.println("Dont open database");
+        sqlite3_finalize(res); // Cleanup
+        sqlite3_close(db1);
         return -1;
     }
     if (sqlite3_step(res) == SQLITE_ROW) {
