@@ -12,12 +12,11 @@
 #define MAX_LINE_LENGTH (64) // Định nghĩa độ dài tối đa của một dòng trong file
 #define mySerial Serial2     // Sử dụng Serial2 cho cảm biến vân tay
 
-RTC_DS1307 rtc; // Khai báo đối tượng RTC
-
+RTC_DS1307 rtc;             // Khai báo đối tượng RTC
 SemaphoreHandle_t spiMutex; // Semaphore để quản lý truy cập SPI
-QueueHandle_t QueueHandle;          // Hàng đợi để truyền ID từ TaskFinger đến TaskSQL
-const uint8_t QueueElementSize = 5; // Số lượng phần tử tối đa trong hàng đợi
-TaskHandle_t taskitn;            // Handle của TaskInternet
+// QueueHandle_t QueueHandle;          // Hàng đợi để truyền ID từ TaskFinger đến TaskSQL
+// const uint8_t QueueElementSize = 5; // Số lượng phần tử tối đa trong hàng đợi
+TaskHandle_t taskitn; // Handle của TaskInternet
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
 enum FingerMode
@@ -33,29 +32,27 @@ class message_lcd
 public:
     int mode = Scan_finger;
     String ip = "Conect Wifi...";
-    const char *noti;
+    String noti;
 };
 unsigned long startTime = millis();
 unsigned long delayTime = 5000; // 5 giây
+unsigned long startTime_f = millis();
+unsigned long delayTime_f = 5000; // 5 giây
 LCD u8g2;
-User_if user;                          // Đối tượng để chứa Thông tin ngươi quét vân tay
 message_lcd message;                   // Đối tượng để chứa thông điệp cho TaskLCD
 DateTime TaskTime();                   // Hàm để lấy thời gian từ module DS1307
-void TaskLCD(void *pvParameters);      // Hàm của TaskLCD
-void TaskSQL(void *pvParameters);      // Hàm của TaskSQL
 void TaskInternet(void *pvParameters); // Hàm của TaskInternet
 int Finger_s();                        // Hàm để đọc ID từ cảm biến vân tay
 // In Thoi Gian
 void drawTime(LCD u8g2); // Hàm để vẽ thời gian lên màn hình
 // Ve File
-void drawFile(u8g2_int_t x, u8g2_int_t y, const char *filename, LCD u8g2); // Hàm để vẽ hình ảnh từ file lên màn hìn
-void record(User_if user);                                                 // Hàm để ghi dữ liệu vào cơ sở dữ liệu
-int Finger_s(LCD finger);                                                  // Hàm để đọc ID từ cảm biến vân tay
+void record(User_if user); // Hàm để ghi dữ liệu vào cơ sở dữ liệu
+int Finger_s(LCD finger);  // Hàm để đọc ID từ cảm biến vân tay
 void drawTime(LCD u8g2)
 {
     DateTime now;
     u8g2.setFont(u8g2_font_timB10_tr);
-    u8g2.setCursor(10, 12);
+    u8g2.setCursor(5, 12);
     now = rtc.now();
     String dateTimeString = String(now.month(), DEC) + '/' +
                             String(now.day(), DEC) + '/' +
@@ -89,12 +86,28 @@ void record(User_if user)
 }
 int Finger_s(Adafruit_Fingerprint finger)
 {
-    // test nên viết ntn nào dùng cảm biến vân tay thì thay code
-    if (Serial.available() > 0)
+    uint8_t p = finger.getImage();
+    if (p != FINGERPRINT_OK)
+        return -1;
+
+    p = finger.image2Tz();
+    if (p != FINGERPRINT_OK)
+        return -1;
+
+    p = finger.fingerSearch();
+    if (p != FINGERPRINT_OK)
     {
-        // Đọc số nguyên từ cổng Serial
-        return Serial.parseInt();
+        message.mode = Incorrect_finger;
+        startTime = millis();
+        Serial.println("Not finger dettec");
+        return -1;
     }
+    // found a match!
+    Serial.print("Found ID #");
+    Serial.print(finger.fingerID);
+    Serial.print(" with confidence of ");
+    Serial.println(finger.confidence);
+    startTime_f = millis();
     return finger.fingerID;
 }
 void setup()
@@ -113,7 +126,7 @@ void setup()
     }
     sqlite3_initialize();
     Serial.println("initialization done.");
-    Wire.setPins(16, 17);
+    Wire.setPins(13, 14);
     if (!rtc.begin())
     {
         Serial.println("Couldn't find RTC");
@@ -124,34 +137,44 @@ void setup()
     {
         Serial.println("Found fingerprint sensor!");
     }
+    else
+    {
+        Serial.println("Did not find fingerprint sensor :(");
+        while (1)
+            ;
+    }
 
     u8g2.begin();
     u8g2.setContrast(25);
     spiMutex = xSemaphoreCreateBinary();
     xSemaphoreGive(spiMutex);
     Serial.print("Semaphore Start");
-    QueueHandle = xQueueCreate(QueueElementSize, sizeof(int));
-    // Check if the queue was successfully created
-    if (QueueHandle == NULL)
-    {
-        Serial.println("Queue could not be created. Halt.");
-        while (1)
-            delay(1000);
-    }
-    Serial.print("QueueStart");
+    // QueueHandle = xQueueCreate(QueueElementSize, sizeof(int));
+    //  Check if the queue was successfully created
+    //  if (QueueHandle == NULL)
+    //  {
+    //      Serial.println("Queue could not be created. Halt.");
+    //      while (1)
+    //          delay(1000);
+    //  }
+    // Serial.print("QueueStart");
     xTaskCreatePinnedToCore(TaskInternet, "TaskInternet", 4000, NULL, 1, &taskitn, 0);
 }
 
 void loop()
 {
-    int finger_id = Finger_s(finger);
-    if (finger_id != 0 && QueueHandle != NULL)
-    { // Sanity check just to make sure the queue actually exists
-        int ret = xQueueSend(QueueHandle, (void *)&finger_id, 0);
-        if (ret == errQUEUE_FULL)
-        {
-            Serial.println("The `TaskReadFromSerial` was unable to send data into the Queue");
-        }
+    int finger_id = -1;
+    if (millis() - startTime_f > delayTime_f)
+    {
+        finger_id = Finger_s(finger);
+        // if (finger_id != -1 && QueueHandle != NULL)
+        // { // Sanity check just to make sure the queue actually exists
+        // int ret = xQueueSend(QueueHandle, (void *)&finger_id, 0);
+        // if (ret == errQUEUE_FULL)
+        // {
+        //     Serial.println("The `TaskReadFromSerial` was unable to send data into the Queue");
+        // }
+        // }
     }
     xSemaphoreTake(spiMutex, portMAX_DELAY);
     u8g2.clearDisplay();
@@ -192,22 +215,27 @@ void loop()
             break;
         }
     } while (u8g2.nextPage());
-    Serial.println(xPortGetFreeHeapSize());
-    int ret = xQueueReceive(QueueHandle, &finger_id, 0);
-    if (ret == pdPASS)
+    // int ret = xQueueReceive(QueueHandle, &finger_id, 0);
+    if (finger_id != -1)
     {
+        Serial.println(xPortGetFreeHeapSize());
+        Serial.println(esp_get_minimum_free_heap_size());
+        User_if user; // Đối tượng để chứa Thông tin ngươi quét vân tay
         Serial.printf("ID find %d:\"\n", finger_id);
-        db_query(finger_id, &user);
-        if (user.name != NULL)
+        int r = db_query(finger_id, &user);
+        Serial.println(r);
+        if (r != 1)
         {
-            record(user);
-            message.noti = user.name;
-            message.mode = Correct_finger;
+            message.mode = Incorrect_finger;
             startTime = millis();
         }
         else
         {
-            message.mode = Incorrect_finger;
+            Serial.println("sadasd");
+            Serial.println(user.name);
+            record(user);
+            message.noti = user.name;
+            message.mode = Correct_finger;
             startTime = millis();
         }
     }
@@ -262,10 +290,6 @@ bool readWiFiCredentials(char *ssid, char *password)
         savedPassword = file.readStringUntil('\n');
         savedSSID.toCharArray(ssid, savedSSID.length());
         savedPassword.toCharArray(password, savedPassword.length());
-        // Serial.println("in ra wifi");
-        // Serial.print(ssid);
-        // Serial.print(" ");
-        // Serial.println(password);
         file.close();
         return true;
     }
@@ -303,7 +327,7 @@ void TaskInternet(void *pvParameters)
     char ssid[30]; // Tên mạng WiFi và mật khẩu mặc định
     char password[30];
     SPIFFS.begin();
-    readWiFiCredentials(ssid,password);
+    readWiFiCredentials(ssid, password);
     // Kết nối WiFi
     WiFi.begin(ssid, password);
     for (int count; count < 20 && WiFi.status() != WL_CONNECTED; count++)

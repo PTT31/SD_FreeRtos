@@ -8,18 +8,18 @@
 #define USER_DB "/sd/Database/User.db"
 class User_if {
 public:
-    char *name;  // Sử dụng con trỏ char thay vì const char để có thể sử dụng strdup
+    char name[30] = "";  // Sử dụng con trỏ char thay vì const char để có thể sử dụng strdup
     int finger_id;
 
-    // Hàm dựng để khởi tạo name bằng NULL
-    User_if() : name(NULL) {}
+    // // Hàm dựng để khởi tạo name bằng NULL
+    // User_if() : name("")  {}
 
-    // Hàm hủy để giải phóng bộ nhớ khi đối tượng bị hủy
-    ~User_if() {
-        if (name != NULL) {
-            free(name);
-        }
-    }
+    // // Hàm hủy để giải phóng bộ nhớ khi đối tượng bị hủy
+    // ~User_if() {
+    //     if (name != NULL) {
+    //         free(name);
+    //     }
+    // }
 };
 static int callback(void *data, int argc, char **argv, char **azColName);
 int openDb(const char *filename, sqlite3 **db);

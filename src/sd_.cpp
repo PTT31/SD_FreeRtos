@@ -64,23 +64,24 @@ int db_query(int data, User_if *user)
         sqlite3_close(db1);
         return -1;
     }
-    if (sqlite3_step(res) == SQLITE_ROW) {
-        // Sử dụng strdup để cấp phát động bộ nhớ cho name
-        user->name = strdup((const char *)sqlite3_column_text(res, 1));
+    if (sqlite3_step(res) == SQLITE_ROW)
+    {
+        strcpy(user->name, (const char *)sqlite3_column_text(res, 1));
         user->finger_id = sqlite3_column_int(res, 0);
         Serial.println(user->name);
-    } else {
+        sqlite3_finalize(res); // Cleanup
+        sqlite3_close(db1);
+        return 1;
+    }
+    else
+    {
         Serial.println("No data found");
-        user->name = NULL;  // Đặt name thành NULL nếu không có dữ liệu
         sqlite3_finalize(res); // Cleanup
         sqlite3_close(db1);
         return -1;
     }
-    sqlite3_finalize(res); // Cleanup
-    sqlite3_close(db1);
-    return 1;
 }
-//Thêm user
+// Thêm user
 int db_insert(char *id, char *name, char *role)
 {
     sqlite3 *db1;
