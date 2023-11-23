@@ -14,8 +14,8 @@
 
 RTC_DS1307 rtc;             // Khai báo đối tượng RTC
 SemaphoreHandle_t spiMutex; // Semaphore để quản lý truy cập SPI
-// QueueHandle_t QueueHandle;          // Hàng đợi để truyền ID từ TaskFinger đến TaskSQL
-// const uint8_t QueueElementSize = 5; // Số lượng phần tử tối đa trong hàng đợi
+QueueHandle_t QueueHandle;          // Hàng đợi để truyền ID từ TaskFinger đến TaskSQL
+const uint8_t QueueElementSize = 5; // Số lượng phần tử tối đa trong hàng đợi
 TaskHandle_t taskitn; // Handle của TaskInternet
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
@@ -77,6 +77,14 @@ void record(User_if user)
                 user.name, user.finger_id);
         dataFile.println(buffer);
         dataFile.close();
+        if (QueueHandle != NULL)
+        { // Sanity check just to make sure the queue actually exists
+        int ret = xQueueSend(QueueHandle, (void *)&buffer, 0);
+        if (ret == errQUEUE_FULL)
+        {
+            Serial.println("The `TaskReadFromSerial` was unable to send data into the Queue");
+        }
+        }
         Serial.println(buffer);
     }
     else
@@ -149,15 +157,15 @@ void setup()
     spiMutex = xSemaphoreCreateBinary();
     xSemaphoreGive(spiMutex);
     Serial.print("Semaphore Start");
-    // QueueHandle = xQueueCreate(QueueElementSize, sizeof(int));
+    QueueHandle = xQueueCreate(QueueElementSize, sizeof(char[50]));
     //  Check if the queue was successfully created
-    //  if (QueueHandle == NULL)
-    //  {
-    //      Serial.println("Queue could not be created. Halt.");
-    //      while (1)
-    //          delay(1000);
-    //  }
-    // Serial.print("QueueStart");
+     if (QueueHandle == NULL)
+     {
+         Serial.println("Queue could not be created. Halt.");
+         while (1)
+             delay(1000);
+     }
+    Serial.print("QueueStart");
     xTaskCreatePinnedToCore(TaskInternet, "TaskInternet", 4000, NULL, 1, &taskitn, 0);
 }
 
@@ -167,14 +175,6 @@ void loop()
     if (millis() - startTime_f > delayTime_f)
     {
         finger_id = Finger_s(finger);
-        // if (finger_id != -1 && QueueHandle != NULL)
-        // { // Sanity check just to make sure the queue actually exists
-        // int ret = xQueueSend(QueueHandle, (void *)&finger_id, 0);
-        // if (ret == errQUEUE_FULL)
-        // {
-        //     Serial.println("The `TaskReadFromSerial` was unable to send data into the Queue");
-        // }
-        // }
     }
     xSemaphoreTake(spiMutex, portMAX_DELAY);
     u8g2.clearDisplay();
@@ -343,6 +343,7 @@ void TaskInternet(void *pvParameters)
     }
     else
     {
+       
         WiFiUDP ntpUDP;
         NTPClient timeClient(ntpUDP, "pool.ntp.org", 7 * 3600);
         Serial.println("");
@@ -355,6 +356,7 @@ void TaskInternet(void *pvParameters)
         rtc.adjust(DateTime(timeClient.getEpochTime()));
         message.ip = WiFi.localIP().toString();
         setupServer();
+       
         // server.on("/", handleRoot);
         // server.on("/login", handleLogin);
         // server.on("/wifi", handleWifi);
@@ -363,6 +365,13 @@ void TaskInternet(void *pvParameters)
     // server.begin();
     while (1)
     {
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        char rc[50];
+        int ret = xQueueReceive(QueueHandle, &rc, portMAX_DELAY);
+        if(ret == pdPASS)
+        {
+            Serial.print("Internet: ");
+            Serial.println(rc);
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
