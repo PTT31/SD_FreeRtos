@@ -197,7 +197,6 @@ void loop()
 
             break;
         case Correct_finger:
-            Serial.println(message.noti);
             u8g2.setCursor(0, 24); // Đặt vị trí để in tên
             u8g2.print("Welcome to Haui");
             u8g2.setCursor(0, 36);    // Đặt vị trí để in tên
@@ -284,8 +283,8 @@ bool readWiFiCredentials(char *ssid, char *password)
     File file = SPIFFS.open("/wifi_credentials.txt", "r");
     if (file)
     {
-        String savedSSID = "A";
-        String savedPassword = "tung3108";
+        String savedSSID = "";
+        String savedPassword = "";
         savedSSID = file.readStringUntil('\n');
         savedPassword = file.readStringUntil('\n');
         savedSSID.toCharArray(ssid, savedSSID.length());
@@ -348,7 +347,7 @@ void TaskInternet(void *pvParameters)
         NTPClient timeClient(ntpUDP, "pool.ntp.org", 7 * 3600);
         Serial.println("");
         Serial.print("Connected to ");
-        Serial.println(WiFi.getAutoConnect());
+        Serial.println(WiFi.SSID());
         Serial.print("IP address: ");
         Serial.println(WiFi.localIP());
         timeClient.begin();
